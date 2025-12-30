@@ -1,7 +1,3 @@
-这是一份为您精心整理的 **中英文双语版** `README.md` 教程。它采用了国际通用的开源项目排版风格，非常适合上传到 GitHub。
-
----
-
 # MMDVM Telegram & WeChat Notifier 📡
 
 ### Pi-Star 通联实时监控助手
