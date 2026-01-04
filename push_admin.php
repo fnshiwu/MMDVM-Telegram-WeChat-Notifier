@@ -1,21 +1,21 @@
 <?php
-// 1. 获取 Pi-Star 核心配置并确定语言
+// 1. 获取 Pi-Star 核心配置，精准定位语言设置
 $pistarConfig = [];
 if (file_exists('/etc/pistar-css.php')) {
     $pistarConfig = parse_ini_file('/etc/pistar-css.php');
 }
-// 优先读取仪表盘选定的语言，默认 english
+// 读取“常规配置”中的仪表盘语言，默认为 english
 $current_lang = isset($pistarConfig['pistar_language']) ? strtolower($pistarConfig['pistar_language']) : 'english';
 
-// 2. 挂载对应的系统语言包
+// 2. 挂载系统原生语言包
 $lang_file = '/var/www/dashboard/lang/'.$current_lang.'.php';
 if (file_exists($lang_file)) {
     include_once($lang_file);
 } else {
-    include_once('/var/www/dashboard/lang/english.php'); // 回退方案
+    include_once('/var/www/dashboard/lang/english.php'); // 找不到则回退到英语
 }
 
-// 3. 插件自定义词条同步 (基于语言包判定)
+// 3. 插件自定义词条翻译 (基于 $current_lang)
 $is_cn = (strpos($current_lang, 'chinese') !== false);
 $txt_push_title  = $is_cn ? "推送功能设置" : "Push Notifier Settings";
 $txt_core_cfg    = $is_cn ? "核心配置" : "Core Configuration";
@@ -29,8 +29,9 @@ $txt_quiet_cfg   = $is_cn ? "静音时段 (Quiet Mode)" : "Quiet Mode Range";
 $txt_save_btn    = $is_cn ? "保存所有设置" : "Save Settings";
 $txt_test_btn    = $is_cn ? "发送测试推送" : "Send Test Push";
 $txt_back_btn    = $is_cn ? "返回" : "Back";
+$txt_enabled     = isset($lang['enabled']) ? $lang['enabled'] : ($is_cn ? "启用" : "Enabled");
 
-// 4. 数据处理逻辑
+// 4. 数据处理与文件保存
 $configFile = '/etc/mmdvm_push.json';
 $config = json_decode(file_get_contents($configFile), true);
 $alertMsg = ""; 
@@ -102,21 +103,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </thead>
             <tbody>
                 <tr>
-                    <td align="right" width="30%"><?php echo $txt_my_call; ?>:</td>
+                    <td align="right" width="35%"><?php echo $txt_my_call; ?>:</td>
                     <td align="left"><input type="text" name="callsign" value="<?php echo $config['my_callsign'];?>" /></td>
                 </tr>
+
                 <tr><th colspan="2"><?php echo $txt_tg_cfg; ?></th></tr>
-                <tr><td align="right"><?php echo $lang['enabled']; ?>:</td><td align="left"><input type="checkbox" name="tg_en" <?php if($config['push_tg_enabled']) echo "checked";?> /></td></tr>
+                <tr><td align="right"><?php echo $txt_enabled; ?>:</td><td align="left"><input type="checkbox" name="tg_en" <?php if($config['push_tg_enabled']) echo "checked";?> /></td></tr>
                 <tr><td align="right">Bot Token:</td><td align="left"><input type="password" name="tg_token" value="<?php echo $config['tg_token'];?>" /></td></tr>
                 <tr><td align="right">Chat ID:</td><td align="left"><input type="text" name="tg_chat_id" value="<?php echo $config['tg_chat_id'];?>" /></td></tr>
+
                 <tr><th colspan="2"><?php echo $txt_wx_cfg; ?></th></tr>
-                <tr><td align="right"><?php echo $lang['enabled']; ?>:</td><td align="left"><input type="checkbox" name="wx_en" <?php if($config['push_wx_enabled']) echo "checked";?> /></td></tr>
+                <tr><td align="right"><?php echo $txt_enabled; ?>:</td><td align="left"><input type="checkbox" name="wx_en" <?php if($config['push_wx_enabled']) echo "checked";?> /></td></tr>
                 <tr><td align="right">Token:</td><td align="left"><input type="password" name="wx_token" value="<?php echo $config['wx_token'];?>" /></td></tr>
+
                 <tr><th colspan="2"><?php echo $txt_filter_cfg; ?></th></tr>
                 <tr><td align="right"><?php echo $txt_ignore; ?>:</td><td align="left"><textarea name="ignore_list"><?php echo implode("\n", $config['ignore_list']);?></textarea></td></tr>
                 <tr><td align="right"><?php echo $txt_focus; ?>:</td><td align="left"><textarea name="focus_list"><?php echo implode("\n", $config['focus_list']);?></textarea></td></tr>
+
                 <tr><th colspan="2"><?php echo $txt_quiet_cfg; ?></th></tr>
-                <tr><td align="right"><?php echo $lang['enabled']; ?>:</td><td align="left"><input type="checkbox" name="qm_en" <?php if($config['quiet_mode']['enabled']) echo "checked";?> /></td></tr>
+                <tr><td align="right"><?php echo $txt_enabled; ?>:</td><td align="left"><input type="checkbox" name="qm_en" <?php if($config['quiet_mode']['enabled']) echo "checked";?> /></td></tr>
                 <tr><td align="right"><?php echo $is_cn ? "时间范围" : "Time Range"; ?>:</td><td align="left">
                     <input type="time" name="qm_start" style="width:100px;" value="<?php echo $config['quiet_mode']['start_time'];?>" /> - 
                     <input type="time" name="qm_end" style="width:100px;" value="<?php echo $config['quiet_mode']['end_time'];?>" />
+                </td></tr>
+
+                <tr>
+                    <td colspan="2" style="background: #ffffff; text-align: center; padding: 15px;">
+                        <input type="submit" name="action" value="save" style="font-weight: bold; width: 140px;" value="<?php echo $txt_save_btn; ?>" />
+                        <button type="submit" name="action" value="test" style="background: #b55; color: white; width: 140px; cursor: pointer; border: 1px solid #000;"><?php echo $txt_test_btn; ?></button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </form>
+    </div>
+
+    <div class="footer">
+        Pi-Star / Pi-Star Dashboard, &copy; Andy Taylor (MW0MWZ) 2014-2026.<br />
+        Push Notifier Mod by BA4SMQ.
+    </div>
+</div>
+</body>
+</html>
