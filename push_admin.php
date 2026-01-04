@@ -1,147 +1,132 @@
 <?php
-// 必须包含 Pi-Star 的核心认证逻辑，确保只有管理员能访问
-if (file_exists('/etc/mmdvm_push.json')) {
-    $configFile = '/etc/mmdvm_push.json';
-} else {
-    die("配置文件不存在，请先运行安装脚本。");
-}
+// MMDVM Push Notifier Admin Page - Optimized for Pi-Star UI
+// File path: /var/www/dashboard/admin/push_admin.php
 
-// 保存逻辑
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $config = json_decode(file_get_contents($configFile), true);
-    $config['push_tg_enabled'] = isset($_POST['tg_enabled']);
-    $config['push_wx_enabled'] = isset($_POST['wx_enabled']);
-    $config['my_callsign'] = strtoupper(trim($_POST['my_callsign']));
-    $config['tg_token'] = trim($_POST['tg_token']);
-    $config['tg_chat_id'] = trim($_POST['tg_chat_id']);
-    $config['wx_token'] = trim($_POST['wx_token']);
-    
-    file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
-    $message = "设置已保存成功！";
-}
+$configFile = '/etc/mmdvm_push.json';
 
+// 加载配置
 $config = json_decode(file_get_contents($configFile), true);
 
-// 检查后台服务状态
-$service_status = shell_exec('systemctl is-active mmdvm-push.service');
-$is_running = (trim($service_status) === 'active');
+// 处理保存逻辑
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && $_POST['action'] === 'save') {
+        $config['push_tg_enabled'] = isset($_POST['tg_en']);
+        $config['push_wx_enabled'] = isset($_POST['wx_en']);
+        $config['my_callsign'] = strtoupper(trim($_POST['callsign']));
+        $config['tg_token'] = trim($_POST['tg_token']);
+        $config['tg_chat_id'] = trim($_POST['tg_chat_id']);
+        $config['wx_token'] = trim($_POST['wx_token']);
+        
+        // 处理列表（逗号或换行分隔转为数组）
+        $config['ignore_list'] = array_filter(array_map('trim', explode("\n", strtoupper($_POST['ignore_list']))));
+        $config['focus_list'] = array_filter(array_map('trim', explode("\n", strtoupper($_POST['focus_list']))));
+        
+        // 处理静音模式
+        $config['quiet_mode']['enabled'] = isset($_POST['qm_en']);
+        $config['quiet_mode']['start_time'] = $_POST['qm_start'];
+        $config['quiet_mode']['end_time'] = $_POST['qm_end'];
+
+        file_put_contents($configFile, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $message = "设置已成功保存！";
+    }
+}
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
-    <meta name="robots" content="index,follow" />
-    <meta name="publisher" content="Pi-Star" />
-    <meta name="author" content="BA4SMQ" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pi-Star - MMDVM 推送设置</title>
-    <link rel="stylesheet" type="text/css" href="/css/ircddblocal.css" /> <style>
-        .status-box { padding: 10px; margin-bottom: 10px; border-radius: 5px; font-weight: bold; }
-        .status-active { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .status-inactive { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        input[type="text"], input[type="password"] { width: 95%; padding: 5px; border: 1px solid #ccc; border-radius: 3px; }
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" type="text/css" href="css/pistar-css.php" />
+    <title>Pi-Star - 推送设置</title>
+    <style>
+        .setting-box { background-color: #eeeeee; padding: 15px; border-radius: 5px; color: #000; margin-bottom: 10px; }
+        .btn-test { background-color: #8b0000; color: white; border: none; padding: 5px 15px; cursor: pointer; }
+        textarea { width: 100%; height: 60px; font-family: monospace; }
     </style>
 </head>
-
 <body>
 <div id="container">
-<div id="header">
-    <div id="logo">
-        <img src="/images/logo.png" width="200" alt="Pi-Star Logo" />
-    </div>
-</div>
+    <div id="header">推送功能管理 - BA4SMQ</div>
+    
+    <form method="post" action="">
+    <div id="main">
+        <?php if(isset($message)) echo "<div style='color:green; font-weight:bold; margin-bottom:10px;'>$message</div>"; ?>
 
-<div id="nav">
-    <a href="/admin/index.php" style="color: #ffffff;">返回控制台</a> |
-    <a href="/admin/configure.php" style="color: #ffffff;">系统配置</a>
-</div>
-
-<div id="main">
-    <div id="content">
-        <div class="section">
-            <h2 style="color: #dd0000;">MMDVM 通联推送设置</h2>
+        <table style="width:100%; border:none;">
+            <tr>
+                <th colspan="2">核心配置</th>
+            </tr>
+            <tr>
+                <td align="right" width="30%">我的呼号:</td>
+                <td><input type="text" name="callsign" value="<?php echo $config['my_callsign'];?>" placeholder="例如: BA4SMQ" /></td>
+            </tr>
             
-            <?php if (isset($message)): ?>
-                <div style="background: #ffffcc; padding: 10px; border: 1px solid #ffcc00; margin-bottom: 15px; color: #333;">
-                    <?php echo $message; ?>
-                </div>
-            <?php endif; ?>
+            <tr><th colspan="2">Telegram 推送设置</th></tr>
+            <tr>
+                <td align="right">启用 TG 推送:</td>
+                <td><input type="checkbox" name="tg_en" <?php if($config['push_tg_enabled']) echo "checked";?> /></td>
+            </tr>
+            <tr>
+                <td align="right">Bot Token:</td>
+                <td><input type="password" name="tg_token" style="width:80%" value="<?php echo $config['tg_token'];?>" /></td>
+            </tr>
+            <tr>
+                <td align="right">Chat ID:</td>
+                <td><input type="text" name="tg_chat_id" value="<?php echo $config['tg_chat_id'];?>" /></td>
+            </tr>
 
-            <div class="status-box <?php echo $is_running ? 'status-active' : 'status-inactive'; ?>">
-                后台推送服务状态: <?php echo $is_running ? '● 正在运行 (Running)' : '○ 已停止 (Stopped)'; ?>
-            </div>
+            <tr><th colspan="2">微信 (PushPlus) 设置</th></tr>
+            <tr>
+                <td align="right">启用微信推送:</td>
+                <td><input type="checkbox" name="wx_en" <?php if($config['push_wx_enabled']) echo "checked";?> /></td>
+            </tr>
+            <tr>
+                <td align="right">PushPlus Token:</td>
+                <td><input type="password" name="wx_token" style="width:80%" value="<?php echo $config['wx_token'];?>" /></td>
+            </tr>
 
-            <form method="post">
-                <table class="table-st" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th colspan="2">基础设置</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td width="30%">我的呼号 (不推送自己):</td>
-                            <td><input type="text" name="my_callsign" value="<?php echo $config['my_callsign']; ?>" placeholder="例如: BA4SMQ" /></td>
-                        </tr>
-                    </tbody>
-                </table>
+            <tr><th colspan="2">黑白名单管理 (每行一个呼号)</th></tr>
+            <tr>
+                <td align="right">忽略列表 (Ignore):<br/><small>不推送这些人的通联</small></td>
+                <td><textarea name="ignore_list"><?php echo implode("\n", $config['ignore_list']);?></textarea></td>
+            </tr>
+            <tr>
+                <td align="right">关注列表 (Focus):<br/><small>优先或特殊提醒</small></td>
+                <td><textarea name="focus_list"><?php echo implode("\n", $config['focus_list']);?></textarea></td>
+            </tr>
 
-                <br />
+            <tr><th colspan="2">静音时段 (Quiet Mode)</th></tr>
+            <tr>
+                <td align="right">启用静音:</td>
+                <td><input type="checkbox" name="qm_en" <?php if($config['quiet_mode']['enabled']) echo "checked";?> /></td>
+            </tr>
+            <tr>
+                <td align="right">开始时间:</td>
+                <td><input type="time" name="qm_start" value="<?php echo $config['quiet_mode']['start_time'];?>" /> (通常为深夜)</td>
+            </tr>
+            <tr>
+                <td align="right">结束时间:</td>
+                <td><input type="time" name="qm_end" value="<?php echo $config['quiet_mode']['end_time'];?>" /> (通常为早晨)</td>
+            </tr>
 
-                <table class="table-st" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th colspan="2">Telegram 配置</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td width="30%">启用 TG 推送:</td>
-                            <td><input type="checkbox" name="tg_enabled" <?php echo $config['push_tg_enabled'] ? 'checked' : ''; ?> /></td>
-                        </tr>
-                        <tr>
-                            <td>Bot Token:</td>
-                            <td><input type="password" name="tg_token" value="<?php echo $config['tg_token']; ?>" /></td>
-                        </tr>
-                        <tr>
-                            <td>Chat ID:</td>
-                            <td><input type="text" name="tg_chat_id" value="<?php echo $config['tg_chat_id']; ?>" /></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <br />
-
-                <table class="table-st" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th colspan="2">微信 (PushPlus) 配置</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td width="30%">启用微信推送:</td>
-                            <td><input type="checkbox" name="wx_enabled" <?php echo $config['push_wx_enabled'] ? 'checked' : ''; ?> /></td>
-                        </tr>
-                        <tr>
-                            <td>PushPlus Token:</td>
-                            <td><input type="password" name="wx_token" value="<?php echo $config['wx_token']; ?>" /></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div style="text-align: center; margin-top: 20px;">
-                    <input type="submit" value="保存设置" style="padding: 10px 40px; background: #dd0000; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;" />
-                </div>
-            </form>
-        </div>
+            <tr>
+                <td colspan="2" align="center" style="padding:20px;">
+                    <button type="submit" name="action" value="save" style="font-weight:bold; padding: 10px 30px;">保存所有设置</button>
+                    <button type="button" onclick="testPush()" class="btn-test">发送测试推送</button>
+                </td>
+            </tr>
+        </table>
     </div>
+    </form>
+    
+    <div id="footer">Pi-Star / MMDVM Notifier by BA4SMQ</div>
 </div>
 
-<div id="footer">
-    Pi-Star / MMDVM Notifier &copy; <?php echo date("Y"); ?> de BA4SMQ
-</div>
-</div>
+<script>
+function testPush() {
+    alert('正在发送测试请求到后台脚本...\n请检查手机 Telegram 或微信。');
+    // 这里可以添加一个简单的 AJAX 调用 push_script.py 的测试接口
+}
+</script>
 </body>
 </html>
