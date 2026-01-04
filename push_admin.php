@@ -3,14 +3,14 @@ session_start();
 $configFile = '/etc/mmdvm_push.json';
 $config = json_decode(file_get_contents($configFile), true);
 
-// 1. 语言判定：手动切换优先，配置文件次之
+// 1. 语言判定逻辑：手动切换优先，配置文件次之
 if (isset($_GET['set_lang'])) {
     $_SESSION['pistar_push_lang'] = $_GET['set_lang'];
 }
 $current_lang = isset($_SESSION['pistar_push_lang']) ? $_SESSION['pistar_push_lang'] : (isset($config['ui_lang']) ? $config['ui_lang'] : 'cn');
 $is_cn = ($current_lang === 'cn');
 
-// 2. 核心词条定义（包含导航栏）
+// 2. 核心词条定义（包含导航栏和按钮）
 if ($is_cn) {
     $nav_dash   = "仪表盘";
     $nav_admin  = "管理";
@@ -98,6 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input[type="text"], input[type="password"], input[type="time"] { width: 95%; border: 1px solid #666; height: 22px; }
         .lang-link { color: #ffff00; text-decoration: none; border: 1px solid #ffff00; padding: 1px 4px; font-size: 10px; border-radius: 3px; }
         .lang-link:hover { background: #ffff00; color: #b55; }
+        .btn-container { background: #ffffff; text-align: center; padding: 15px; }
+        .btn-save { font-weight: bold; width: 140px; height: 32px; cursor: pointer; background: #eee; border: 1px solid #666; }
+        .btn-test { background: #b55; color: white; width: 140px; height: 32px; cursor: pointer; border: 1px solid #000; font-weight: bold; margin-left: 10px; }
     </style>
     <script type="text/javascript"><?php if ($alertMsg) { echo "alert('$alertMsg');"; } ?></script>
 </head>
@@ -147,15 +150,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <tr><th colspan="2"><?php echo $txt_quiet; ?></th></tr>
                 <tr><td align="right"><?php echo $txt_en; ?>:</td><td align="left"><input type="checkbox" name="qm_en" <?php if($config['quiet_mode']['enabled']) echo "checked";?> /></td></tr>
-                <tr><td align="right"><?php echo $is_cn ? "起止时间" : "Time Range"; ?>:</td><td align="left">
+                <tr><td align="right"><?php echo $is_cn ? "时间范围" : "Time Range"; ?>:</td><td align="left">
                     <input type="time" name="qm_start" style="width:100px;" value="<?php echo $config['quiet_mode']['start_time'];?>" /> - 
                     <input type="time" name="qm_end" style="width:100px;" value="<?php echo $config['quiet_mode']['end_time'];?>" />
                 </td></tr>
 
                 <tr>
-                    <td colspan="2" style="background: #ffffff; text-align: center; padding: 15px;">
-                        <input type="submit" name="action" value="save" style="font-weight: bold; width: 140px; height: 30px; cursor: pointer;" />
-                        <button type="submit" name="action" value="test" style="background: #b55; color: white; width: 140px; height: 30px; cursor: pointer; border: 1px solid #000; font-weight: bold;"><?php echo $txt_test; ?></button>
+                    <td colspan="2" class="btn-container">
+                        <button type="submit" name="action" value="save" class="btn-save">
+                            <?php echo $txt_save; ?>
+                        </button>
+                        <button type="submit" name="action" value="test" class="btn-test">
+                            <?php echo $txt_test; ?>
+                        </button>
                     </td>
                 </tr>
             </tbody>
