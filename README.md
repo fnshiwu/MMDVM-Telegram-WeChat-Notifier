@@ -1,82 +1,101 @@
+既然你的项目已经实现了从**后端监控**、**前端原生 UI 管理**到**一键安装脚本**的全栈功能，我们需要一份高质量的 GitHub `README.md` 来提升专业度。
 
-### 📖 GitHub 教程 (README.md - 双语版)
-
-# MMDVM Push Notification Tool for Pi-Star
-
-[中文版](## 中文版教程) | [English Version](## English Version)
+这份教程采用了中英文双语架构，重点突出了**一键安装**和**原生集成**。
 
 ---
 
-<a name="chinese-version"></a>
+# 🎙️ MMDVM Telegram & WeChat Notifier
 
-## 中文版教程
+[English Version](https://www.google.com/search?q=%23english-guide) | [中文说明](https://www.google.com/search?q=%23chinese-guide)
 
-这是一个为 Pi-Star 设计的实时通联推送工具，支持通过 Telegram 和 微信 (PushPlus) 发送提醒。
+---
 
-### 🌟 功能
+<a name="chinese-guide"></a>
 
-* **原生集成**：在 Pi-Star 管理页面导航栏直接添加“推送设置”链接。
-* **双平台**：支持 Telegram Bot 和 微信 PushPlus 接口。
-* **智能策略**：支持黑名单（忽略）、白名单（关注）以及夜间静音模式。
-* **可视化管理**：无需修改代码，在网页端即可设置 Token 和 过滤列表。
+## 🇨🇳 中文说明
+
+这是一个为 **Pi-Star** 热点板深度定制的通联实时推送工具。它能够自动监控 MMDVM 日志，识别语音与数据通联，并通过 Telegram 或微信（PushPlus）将精美格式的消息推送到您的手机。
+
+### ✨ 核心亮点
+
+* **原生 UI 集成**：管理页面完美适配 Pi-Star 红黑配色风格，直接集成在后台菜单。
+* **智能识别**：自动区分 `🎙️ 话音通联` 与 `📟 数据业务`。
+* **实时状态**：管理界面内置服务状态灯，实时显示监控进程是否正常。
+* **时区补偿**：自动将日志的 UTC 时间转换为 **北京时间** 进行推送。
+* **开箱即用**：提供一键安装指令，自动处理权限、依赖与菜单挂载。
 
 ### 🚀 快速安装
 
-1. **运行环境初始化**：
+在 Pi-Star 终端（SSH）中，直接复制并运行以下命令：
+
 ```bash
-rpi-rw
-wget -qO- https://github.com/fnshiwu/MMDVM-Telegram-WeChat-Notifier/blob/main/install.sh
+rpi-rw && cd /home/pi-star && git clone https://github.com/fnshiwu/MMDVM-Telegram-WeChat-Notifier.git && cd MMDVM-Telegram-WeChat-Notifier && chmod +x install.sh && sed -i 's/\r$//' install.sh && sudo ./install.sh
 
 ```
 
+### ⚙️ 使用说明
 
-2. **部署 Web 页面**：
-将本仓库的 `push_admin.php` 上传到盒子的 `/var/www/dashboard/admin/` 目录。
-3. **启动监控**：
-运行后台 Python 脚本 `python3 push_script.py &`。
-
-### ⚙️ 设置说明
-
-1. 登录 Pi-Star，点击菜单栏新增的 **“推送设置”**。
-2. 填写 Token 后点击 **“保存所有配置”**。
-3. 点击 **“🧪 发送测试”** 确保配置正确。
+1. 安装完成后，刷新 Pi-Star 管理后台页面。
+2. 在顶部菜单点击 **[推送设置]**（或手动访问 `http://你的IP/admin/push_admin.php`）。
+3. 填写您的呼号、TG Token 或微信 Token。
+4. 点击 **保存设置**，推送服务将自动生效。
 
 ---
 
-<a name="english-version"></a>
+<a name="english-guide"></a>
 
-## English Version
+## 🇺🇸 English Guide
 
-A real-time notification tool for Pi-Star, allowing users to receive MMDVM activity alerts via Telegram and WeChat (PushPlus).
+A professional real-time notification tool for **Pi-Star** hotspots. It monitors MMDVM logs and sends formatted alerts to **Telegram** or **WeChat** (via PushPlus).
 
-### 🌟 Features
+### 🌟 Key Features
 
-* **Seamless Integration**: Adds a "Push Setting" link directly to the Pi-Star admin navigation bar.
-* **Dual Platforms**: Supports Telegram Bot and WeChat (via PushPlus API).
-* **Smart Filtering**: Custom Callign Focus (Whitelist), Ignore (Blacklist), and Quiet Mode (DND).
-* **Web UI Management**: Manage Tokens and filters via the web interface without touching the console.
+* **Native UI**: Seamlessly integrates into the Pi-Star admin panel with a matching theme.
+* **Smart Recognition**: Distinguishes between `🎙️ Voice Transmission` and `📟 Data Service`.
+* **Live Status**: Built-in service indicator to monitor the background process.
+* **Timezone Support**: Automatically adjusts UTC log timestamps to local time.
+* **One-Click Deployment**: Automates dependency installation, permissions, and menu injection.
 
-### 🚀 Quick Start
+### 📦 Installation
 
-1. **Initialization**:
+Run the following command in your Pi-Star terminal via SSH:
+
 ```bash
-rpi-rw
-wget -qO- https://github.com/fnshiwu/MMDVM-Telegram-WeChat-Notifier/blob/main/install.sh
+rpi-rw && cd /home/pi-star && git clone https://github.com/fnshiwu/MMDVM-Telegram-WeChat-Notifier.git && cd MMDVM-Telegram-WeChat-Notifier && chmod +x install.sh && sed -i 's/\r$//' install.sh && sudo ./install.sh
 
 ```
 
+---
 
-2. **Deploy Web Interface**:
-Upload `push_admin.php` to your Pi-Star at `/var/www/dashboard/admin/`.
-3. **Run Monitor**:
-Execute the background service: `python3 push_script.py &`.
+## 📂 仓库结构 (Repository Structure)
 
-### ⚙️ Configuration
-
-1. Open Pi-Star dashboard and click **"Push Setting"** in the top menu.
-2. Enter your Tokens and click **"Save All Settings"**.
-3. Click **"🧪 Send Test"** to verify the connection.
+| 文件 (File) | 描述 (Description) |
+| --- | --- |
+| `push_script.py` | 后端 Python 监控脚本，负责正则解析与 API 发送 |
+| `push_admin.php` | 前端 PHP 管理界面，提供原生风格的配置表单 |
+| `install.sh` | 自动化集成脚本，负责菜单注入与服务配置 |
+| `mmdvm-push.service` | Systemd 守护进程，确保程序开机自启 |
 
 ---
 
-**Would you like me to help you create a `systemd` service file so that the Python script starts automatically every time you power on your Pi-Star?**
+## 🛠️ 常见问题排查 (Troubleshooting)
+
+* **没有推送？**
+1. 请确保在网页端填写的“我的呼号”与实际发射呼号一致（脚本默认不推送自己的发射）。
+2. 使用 `sudo journalctl -u mmdvm-push.service -f` 检查实时运行日志。
+
+
+* **管理页面报 403 错误？**
+执行 `sudo chown www-data:www-data /var/www/dashboard/admin/push_admin.php` 修复权限。
+* **无法保存配置？**
+执行 `sudo chmod 666 /etc/mmdvm_push.json`。
+
+---
+
+## 🤝 贡献 (Contribution)
+
+欢迎通过 Pull Request 提交更好的正则匹配规则或 UI 改进方案。
+
+**73! de BA4SMQ**
+
+---
