@@ -38,10 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['set_lang'])) {
     $action = $_POST['action'];
     if (in_array($action, ['start', 'stop', 'restart'])) shell_exec("sudo systemctl $action $serviceName");
     
-    // --- 修复点：带 sudo 和反馈的测试逻辑 ---
     if ($action === 'test') {
         $out = [];
         $res = 0;
+        // 关键点：2>&1 确保错误信息也能被捕获
         exec("sudo /usr/bin/python3 $scriptPath --test 2>&1", $out, $res);
         $msg = implode(" ", $out);
         $alertMsg = ($config['ui_lang'] == 'cn') ? "测试反馈: $msg" : "Test Feedback: $msg";
@@ -85,7 +85,7 @@ $lang = [
         </p>
     </div>
     <div class="contentwide">
-        <?php if(isset($alertMsg)) echo "<div style='background:#ffffc0; color:#000; padding:5px; text-align:center; border:1px solid #666;'>$alertMsg</div>"; ?>
+        <?php if(isset($alertMsg)) echo "<div style='background:#ffffc0; color:#000; padding:5px; text-align:center; border:1px solid #666;'><b>$alertMsg</b></div>"; ?>
         <form method="post">
         <table class="settings">
             <thead><tr><th colspan="2"><?php echo $lang['srv_ctrl']; ?></th></tr></thead>
