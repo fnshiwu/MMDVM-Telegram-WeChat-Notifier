@@ -5,7 +5,7 @@ from threading import Thread
 CONFIG_FILE = "/etc/mmdvm_push.json"
 LOG_DIR = "/var/log/pi-star/"
 
-# 预编译正则：性能优化，样式还原
+# 预编译正则
 RE_VOICE = re.compile(r'end of (?:voice )?transmission', re.IGNORECASE)
 RE_DATA = re.compile(r'end of data transmission', re.IGNORECASE)
 RE_CALL = re.compile(r'from\s+([A-Z0-9/]+)')
@@ -19,23 +19,21 @@ def async_post(url, data=None, is_json=False):
             req = urllib.request.Request(url, data=data, method='POST') if data else urllib.request.Request(url)
             if is_json: req.add_header('Content-Type', 'application/json')
             with urllib.request.urlopen(req, timeout=3) as r:
-                if "--test" in sys.argv: print("Success")
+                if "--test" in sys.argv: print("发送成功 (Success)")
         except Exception as e:
-            if "--test" in sys.argv: print(f"Error: {str(e)}")
-
-    if "--test" in sys.argv: task() # 测试模式同步执行以反馈结果
+            if "--test" in sys.argv: print(f"发送失败 (Error): {str(e)}")
+    
+    if "--test" in sys.argv: task()
     else: Thread(target=task, daemon=True).start()
 
 def send_payload(config, type_label, body_text):
     msg_header = "━━━━━━━━━━━━━━━\n"
-    # PushPlus (微信)
     if config.get('push_wx_enabled') and config.get('wx_token'):
         wx_body = body_text.replace("\n", "<br>").replace("**", "<b>").replace("**", "</b>")
         d = json.dumps({"token": config['wx_token'], "title": f"{type_label}", 
                         "content": f"<b>{type_label}</b><br>{wx_body}", "template": "html"}).encode()
         async_post("http://www.pushplus.plus/send", data=d, is_json=True)
     
-    # Telegram
     if config.get('push_tg_enabled') and config.get('tg_token'):
         params = urllib.parse.urlencode({"chat_id": config['tg_chat_id'], 
                                          "text": f"*{type_label}*\n{msg_header}{body_text}", "parse_mode": "Markdown"})
@@ -67,7 +65,6 @@ def monitor():
                     if is_v and (dur < conf.get('min_duration', 1.0) or call == conf.get('my_callsign')): continue
                     if is_d and call == conf.get('my_callsign'): continue
                     
-                    # 时区转换：UTC -> Local
                     t_m = RE_TIME.search(line)
                     if t_m:
                         utc_time = datetime.strptime(t_m.group(), "%Y-%m-%d %H:%M:%S")
@@ -79,7 +76,9 @@ def monitor():
                         time_str = datetime.now().strftime("%H:%M:%S")
                     
                     is_cn = conf.get('ui_lang', 'cn') == 'cn'
-                    type_label = ("🎙️ 语音通联" if is_v else "📡 数据传输") if is_cn else ("🎙️ Voice" if is_v else "📡 Data")
+                    # --- 仅修改此处图标：📡 更改为 💾 ---
+                    type_label = ("🎙️ 语音通联" if is_v else "💾 数据传输") if is_cn else ("🎙️ Voice" if is_v else "💾 Data")
+                    # ------------------------------------
                     target = RE_TARGET.search(line).group(1) if RE_TARGET.search(line) else 'Unknown'
                     slot = 'Slot 1' if 'Slot 1' in line else 'Slot 2'
                     
@@ -97,11 +96,14 @@ if __name__ == "__main__":
         try:
             with open(CONFIG_FILE, 'r') as cf: c = json.load(cf)
             n = datetime.now()
-            body = (f"👤 **呼号**: {c.get('my_callsign','NOCALL')}\n👥 **群组**: TG 460\n"
-                    f"📅 **日期**: {n.strftime('%Y-%m-%d')}\n⏰ **时间**: {n.strftime('%H:%M:%S')}\n"
-                    f"📡 **时隙**: Slot 2\n⏳ **时长**: 0.0秒")
+            body = (f"👤 **呼号**: {c.get('my_callsign','BA4SMQ')}\n"
+                    f"👥 **群组**: TG 460\n"
+                    f"📅 **日期**: {n.strftime('%Y-%m-%d')}\n"
+                    f"⏰ **时间**: {n.strftime('%H:%M:%S')}\n"
+                    f"📡 **时隙**: Slot 2\n"
+                    f"⏳ **时长**: 0.0秒")
             send_payload(c, "🔔 测试推送", body)
-        except: pass
+        except: print("错误: 配置文件读取失败")
     else:
         while True:
             try: monitor()
