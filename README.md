@@ -1,7 +1,7 @@
 
 ---
 
-# MMDVM-Push-Notifier (v2.82)
+# MMDVM-Push-Notifier (v2.89)
 
 **Real-time Activity Notifications for Pi-Star via Telegram & WeChat** **基于 Pi-Star 的 MMDVM 通联实时推送系统 (Telegram & 微信)**
 
@@ -21,7 +21,7 @@
 * **Quiet Mode**: Schedule "Do Not Disturb" hours (supports overnight range).
 * **Pi-Star Integrated**: Native Pi-Star CSS style and bilingual support (CN/EN).
 * **网页管理面板**: 在 `http://pi-star.local/admin/push_admin.php` 轻松配置。
-* **双通道推送**: 支持 Telegram 机器人及微信 (通过 PushPlus)。
+* **多通道推送**: 支持 Telegram 机器人及微信 (通过 PushPlus)，飞书机器人。
 * **智能过滤**: 支持呼号黑白名单过滤，以及自定义最小通联时长过滤。
 * **静音模式**: 支持设置免打扰时段（支持跨天设置）。
 * **深度集成**: 采用 Pi-Star 原生样式，支持中英文双语切换。
