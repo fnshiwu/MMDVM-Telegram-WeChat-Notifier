@@ -8,6 +8,7 @@ LOG_DIR = "/var/log/pi-star/"
 LOCAL_ID_FILE = "/usr/local/etc/DMRIds.dat"
 
 class HamInfoManager:
+    """处理呼号信息查询与缓存"""
     def __init__(self, id_file):
         self.id_file = id_file
         self.cache = {}
@@ -29,6 +30,7 @@ class HamInfoManager:
         return {"name": "", "loc": "Unknown"}
 
 class PushService:
+    """管理多平台推送逻辑"""
     @staticmethod
     def get_fs_sign(secret, timestamp):
         string_to_sign = f'{timestamp}\n{secret}'
@@ -50,16 +52,19 @@ class PushService:
     def send(cls, config, type_label, body_text, is_voice=True, async_mode=True):
         def build_and_send():
             msg_header = "━━━━━━━━━━━━━━━\n"
+            # 1. 微信推送
             if config.get('push_wx_enabled') and config.get('wx_token'):
                 br = "<br>"
                 html_content = f"<b>{type_label}</b>{br}{br.join(body_text.splitlines())}"
                 d = json.dumps({"token": config['wx_token'], "title": type_label, "content": html_content, "template": "html"}).encode()
                 cls.post_request("http://www.pushplus.plus/send", data=d, is_json=True)
             
+            # 2. Telegram 推送
             if config.get('push_tg_enabled') and config.get('tg_token'):
                 params = urllib.parse.urlencode({"chat_id": config['tg_chat_id'], "text": f"*{type_label}*\n{msg_header}{body_text}", "parse_mode": "Markdown"})
                 cls.post_request(f"https://api.telegram.org/bot{config['tg_token']}/sendMessage?{params}")
             
+            # 3. 飞书推送
             if config.get('push_fs_enabled') and config.get('fs_webhook'):
                 ts = str(int(time.time()))
                 fs_payload = {"msg_type": "interactive", "card": {"header": {"title": {"tag": "plain_text", "content": type_label}, "template": "blue" if is_voice else "green"}, "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body_text}}]}}
@@ -73,14 +78,17 @@ class PushService:
             build_and_send()
 
 class MMDVMMonitor:
+    """核心监控类"""
     def __init__(self):
         self.last_msg = {"call": "", "ts": 0}
         self.ham_manager = HamInfoManager(LOCAL_ID_FILE)
-        # 修正后的正则，精准适配你的日志格式
+        # 精准匹配：捕获呼号、目标、时长、丢包率、误码率
         self.re_master = re.compile(
             r'end of (?P<v_type>(?:voice )?|data )transmission from '
             r'(?P<call>[A-Z0-9/\-]+) to (?P<target>[A-Z0-9/\-\s]+?), '
-            r'(?P<dur>\d+\.?\d*) seconds', 
+            r'(?P<dur>\d+\.?\d*) seconds, '
+            r'(?P<loss>\d+)% packet loss, '
+            r'BER: (?P<ber>\d+\.?\d*)%', 
             re.IGNORECASE
         )
 
@@ -95,7 +103,7 @@ class MMDVMMonitor:
         return max(log_files, key=os.path.getmtime) if log_files else None
 
     def run(self):
-        print(f"MMDVM 监控启动成功，正在实时解析日志...")
+        print(f"MMDVM 监控启动成功，正在实时抓取日志指标...")
         while True:
             try:
                 current_log = self.get_latest_log()
@@ -115,18 +123,20 @@ class MMDVMMonitor:
                 print(f"运行异常: {e}"); time.sleep(5)
 
     def process_line(self, line):
-        # 只要包含结束标志，就尝试匹配
         if "end of" not in line.lower(): return
         
         match = self.re_master.search(line)
         if not match: return
 
         try:
+            # 提取原始数值
             v_type_raw = match.group('v_type').lower()
             is_v = 'data' not in v_type_raw
             call = match.group('call').upper()
             target = match.group('target').strip()
             dur = float(match.group('dur'))
+            loss = int(match.group('loss'))
+            ber = float(match.group('ber'))
 
             if not os.path.exists(CONFIG_FILE): return
             with open(CONFIG_FILE, 'r') as cf: conf = json.load(cf)
@@ -142,27 +152,33 @@ class MMDVMMonitor:
             
             self.last_msg.update({"call": call, "ts": curr_ts})
             info = self.ham_manager.get_info(call)
-            
-            # 自动提取 Slot
             slot = "Slot 1" if "Slot 1" in line else "Slot 2"
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 匹配成功: {call} -> {target} ({dur}s)")
-            
-            type_label = f"🎙️ 语音通联 ({slot})" if is_v else f"💾 数据模式 ({slot})"
-            body = (f"👤 **呼号**: {call}{info['name']}\n👥 **群组**: {target}\n📍 **地区**: {info['loc']}\n"
-                    f"📅 **日期**: {datetime.now().strftime('%Y-%m-%d')}\n⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}\n⏳ **时长**: {dur}秒")
+            # --- 构造推送模板 ---
+            # 保持基础信息的 Emoji，但丢包率和误码率只显示数值
+            type_label = f"🎙️ 语音 ({slot})" if is_v else f"💾 数据 ({slot})"
+            body = (f"👤 **呼号**: {call}{info['name']}\n"
+                    f"👥 **群组**: {target}\n"
+                    f"📍 **地区**: {info['loc']}\n"
+                    f"📅 **日期**: {datetime.now().strftime('%Y-%m-%d')}\n"
+                    f"⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}\n"
+                    f"⏳ **时长**: {dur}秒\n"
+                    f"📦 **丢失**: {loss}%\n"
+                    f"📉 **误码**: {ber}%")
             
             PushService.send(conf, type_label, body, is_voice=is_v, async_mode=True)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 匹配成功: {call} | Loss: {loss}% | BER: {ber}%")
+            
         except Exception as e:
-            print(f"处理错误: {e}")
+            print(f"解析错误: {e}")
 
 if __name__ == "__main__":
     monitor = MMDVMMonitor()
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
         try:
             with open(CONFIG_FILE, 'r') as cf: c = json.load(cf)
-            PushService.send(c, "🔔 MMDVM 监控测试", "正则校准版测试成功！", is_voice=True, async_mode=False)
-            print("测试推送已发出，请查收。")
+            PushService.send(c, "🔔 MMDVM 监控测试", "数值 Emoji 已去除，保持原始数据呈现。", is_voice=True, async_mode=False)
+            print("测试推送已发出。")
         except Exception as e: print(f"测试失败: {e}")
     else:
         monitor.run()
