@@ -1,7 +1,7 @@
 
 ---
 
-# MMDVM-Push-Notifier (v2.91)
+# MMDVM-Push-Notifier (v2.93)
 
 **Real-time Activity Notifications for Pi-Star via Telegram & WeChat** **基于 Pi-Star 的 MMDVM 通联实时推送系统 (Telegram & 微信 & 飞书)**
 
