@@ -32,6 +32,7 @@ class ConfigManager:
         return cls._config
 
 class HamInfoManager:
+    """呼号信息检索：严格还原完整国家表"""
     def __init__(self, id_file):
         self.id_file = id_file
         self._io_lock = Semaphore(4)
@@ -60,8 +61,9 @@ class HamInfoManager:
                         last_name = parts[3].strip() if len(parts) > 3 else ""
                         city = parts[4].strip().title() if len(parts) > 4 else ""
                         state = parts[5].strip().upper() if len(parts) > 5 else ""
-                        country = parts[6].strip() if len(parts) > 6 else ""
-
+                        country = parts[6].strip()
+                        
+                        # --- 真正完整国家映射表：严格对比还原 ---
                         geo_map = {
                             "China": "🇨🇳 中国", "Hong Kong": "🇭🇰 中国香港", "Macao": "🇲🇴 中国澳门", "Taiwan": "🇹🇼 中国台湾",
                             "Japan": "🇯🇵 日本", "Korea": "🇰🇷 韩国", "South Korea": "🇰🇷 韩国", "North Korea": "🇰🇵 朝鲜",
@@ -101,7 +103,7 @@ class HamInfoManager:
                                     break
                         else:
                             country = geo_map.get(country, country)
-                        
+
                         full_name = f"{first_name} {last_name}".strip().upper()
                         loc = f"{city}, {state} ({country})"
                         return {"name": f" ({full_name})", "loc": loc}
@@ -166,7 +168,6 @@ class MMDVMMonitor:
         )
 
     def get_sys_info(self):
-        """获取系统状态：IP, CPU, 内存"""
         try:
             ip = subprocess.getoutput("hostname -I").split()[0]
             cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'")
@@ -201,12 +202,10 @@ class MMDVMMonitor:
                 alert_body = (f"🚨 **硬件高温预警**\n"
                               f"🔥 **当前温度**: {display_str}\n"
                               f"⚠️ **预警阈值**: {threshold:.1f}{conf.get('temp_unit','C')}\n"
-                              f"⏰ **检测时间**: {datetime.now().strftime('%H:%M:%S')}\n"
-                              f"ℹ️ **说明**: 盒子温度过高，请注意通风散热。")
+                              f"⏰ **检测时间**: {datetime.now().strftime('%H:%M:%S')}")
                 PushService.send(conf, "🌡️ 硬件状态警告", alert_body, is_voice=False)
 
     def send_boot_notification(self, conf):
-        """发送设备上线通知"""
         if not conf.get('boot_push_enabled', True): return
         ip, cpu, mem = self.get_sys_info()
         temp_str, _ = self.get_current_temp(conf)
@@ -220,8 +219,16 @@ class MMDVMMonitor:
 
     def run(self):
         conf = ConfigManager.get_config()
-        self.send_boot_notification(conf) # 启动时发送上线通知
-        print(f"MMDVM 监控启动：设备上线通知、温度显示与预警已就绪")
+        
+        # --- 开机等待IP获取逻辑（解决重启不推送） ---
+        for i in range(12):
+            ip_check = subprocess.getoutput("hostname -I").strip()
+            if ip_check and not ip_check.startswith("127."):
+                break
+            time.sleep(5)
+
+        self.send_boot_notification(conf) 
+        
         while True:
             try:
                 log_files = glob.glob(os.path.join(LOG_DIR, "MMDVM-*.log"))
