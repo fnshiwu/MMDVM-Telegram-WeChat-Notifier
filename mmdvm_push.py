@@ -32,7 +32,7 @@ class ConfigManager:
         return cls._config
 
 class HamInfoManager:
-    """呼号信息检索：严格还原完整国家表"""
+    """呼号信息检索：严格还原原始版完整国家表"""
     def __init__(self, id_file):
         self.id_file = id_file
         self._io_lock = Semaphore(4)
@@ -53,7 +53,7 @@ class HamInfoManager:
                         raw_line = mm[start:end]
                         try:
                             line = raw_line.decode('utf-8')
-                        except UnicodeDecodeError:
+                        except:
                             line = raw_line.decode('gb18030', 'ignore')
                         
                         parts = line.split(',')
@@ -63,7 +63,7 @@ class HamInfoManager:
                         state = parts[5].strip().upper() if len(parts) > 5 else ""
                         country = parts[6].strip()
                         
-                        # --- 真正完整国家映射表：严格对比还原 ---
+                        # --- 原始版完整国家映射表（100% 搬运） ---
                         geo_map = {
                             "China": "🇨🇳 中国", "Hong Kong": "🇭🇰 中国香港", "Macao": "🇲🇴 中国澳门", "Taiwan": "🇹🇼 中国台湾",
                             "Japan": "🇯🇵 日本", "Korea": "🇰🇷 韩国", "South Korea": "🇰🇷 韩国", "North Korea": "🇰🇵 朝鲜",
@@ -121,13 +121,15 @@ class PushService:
         return base64.b64encode(hmac_code).decode('utf-8')
 
     @classmethod
-    def _do_send_task(cls, config, type_label, body_text, is_voice):
+    def _do_push_logic(cls, config, type_label, body_text, is_voice):
+        # 飞书
         if config.get('push_fs_enabled') and config.get('fs_webhook'):
             ts = str(int(time.time()))
+            template = "blue" if is_voice else "orange" if "上线" in type_label else "green"
             fs_payload = {
                 "msg_type": "interactive", 
                 "card": {
-                    "header": {"title": {"tag": "plain_text", "content": type_label}, "template": "blue" if is_voice else "orange" if "上线" in type_label else "green"}, 
+                    "header": {"title": {"tag": "plain_text", "content": type_label}, "template": template}, 
                     "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body_text}}]
                 }
             }
@@ -135,11 +137,19 @@ class PushService:
                 fs_payload["timestamp"], fs_payload["sign"] = ts, cls.get_fs_sign(config['fs_secret'], ts)
             cls.post_request(config['fs_webhook'], data=json.dumps(fs_payload).encode(), is_json=True)
 
+        # 微信 (PushPlus)
         if config.get('push_wx_enabled') and config.get('wx_token'):
             br = "<br>"
             html_content = f"<b>{type_label}</b>{br}{br.join(body_text.splitlines())}"
             d = json.dumps({"token": config['wx_token'], "title": type_label, "content": html_content, "template": "html"}).encode()
             cls.post_request("http://www.pushplus.plus/send", data=d, is_json=True)
+
+        # TG
+        if config.get('push_tg_enabled') and config.get('tg_token') and config.get('tg_chat_id'):
+            text = f"<b>{type_label}</b>\n\n{body_text}"
+            url = f"https://api.telegram.org/bot{config['tg_token']}/sendMessage"
+            d = urllib.parse.urlencode({"chat_id": config['tg_chat_id'], "text": text, "parse_mode": "HTML"}).encode()
+            cls.post_request(url, data=d)
 
     @classmethod
     def post_request(cls, url, data=None, is_json=False):
@@ -150,8 +160,11 @@ class PushService:
         except: return None
 
     @classmethod
-    def send(cls, config, type_label, body_text, is_voice=True):
-        cls._executor.submit(cls._do_send_task, config, type_label, body_text, is_voice)
+    def send(cls, config, type_label, body_text, is_voice=True, async_mode=True):
+        if async_mode:
+            cls._executor.submit(cls._do_push_logic, config, type_label, body_text, is_voice)
+        else:
+            cls._do_push_logic(config, type_label, body_text, is_voice)
 
 class MMDVMMonitor:
     def __init__(self):
@@ -173,8 +186,7 @@ class MMDVMMonitor:
             cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'")
             mem = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.1f%%\", $3*100/$2 }'")
             return ip, cpu, mem
-        except:
-            return "Unknown", "0", "0"
+        except: return "Unknown", "0", "0"
 
     def get_current_temp(self, conf):
         try:
@@ -185,8 +197,7 @@ class MMDVMMonitor:
                 val = (temp_c * 9/5) + 32
                 return f"{val:.1f}°F", val
             return f"{temp_c:.1f}°C", temp_c
-        except:
-            return "N/A", 0.0
+        except: return "N/A", 0.0
 
     def check_temp_alert(self, conf):
         if not conf.get('temp_alert_enabled'): return
@@ -216,34 +227,22 @@ class MMDVMMonitor:
                 f"💾 **内存占用**: {mem}\n"
                 f"⏰ **上线时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         PushService.send(conf, "⚙️ 系统启动通知", body, is_voice=False)
-    
+
     def run_test(self):
-        """同步执行测试逻辑"""
         conf = ConfigManager.get_config()
-        ip, cpu, mem = self.get_sys_info()
+        ip, _, _ = self.get_sys_info()
         temp_str, _ = self.get_current_temp(conf)
-        test_body = (f"🛠️ **同步测试推送**\n"
-                     f"✅ **网络状态**: 正常\n"
-                     f"🌐 **IP**: {ip}\n"
-                     f"🌡️ **温度**: {temp_str}\n"
-                     f"⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}")
-        print("Executing Synchronous Test Push...")
-        # 使用同步发送方法
-        PushService.send_sync(conf, "🔔 测试推送", test_body, is_voice=False)
-        print("Sync test completed.")
-    
+        test_body = f"🛠️ **推送通道测试成功**\n🌐 **IP**: {ip}\n🌡️ **温度**: {temp_str}\n⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}"
+        PushService.send(conf, "🔔 测试推送", test_body, is_voice=False, async_mode=False)
+        print("Success")
+
     def run(self):
         conf = ConfigManager.get_config()
-        
-        # --- 开机等待IP获取逻辑（解决重启不推送） ---
         for i in range(12):
             ip_check = subprocess.getoutput("hostname -I").strip()
-            if ip_check and not ip_check.startswith("127."):
-                break
+            if ip_check and not ip_check.startswith("127."): break
             time.sleep(5)
-
         self.send_boot_notification(conf) 
-        
         while True:
             try:
                 log_files = glob.glob(os.path.join(LOG_DIR, "MMDVM-*.log"))
@@ -261,26 +260,23 @@ class MMDVMMonitor:
         if "end of" not in line.lower(): return
         match = self.re_master.search(line)
         if not match: return
-        
         conf = ConfigManager.get_config()
-        self.check_temp_alert(conf)
-        
+        self.check_temp_alert(conf) # 保留原始温度检测逻辑
         call = match.group('call').upper()
         dur = float(match.group('dur'))
-        loss, ber = match.group('loss'), match.group('ber')
+        loss, ber = match.group('loss'), match.group('ber') # 独立丢包和误码
         target = match.group('target').strip()
-        
         if call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0): return
         curr_ts = time.time()
         if call == self.last_msg["call"] and (curr_ts - self.last_msg["ts"]) < 3: return
-        
         self.last_msg.update({"call": call, "ts": curr_ts})
         info = self.ham_manager.get_info(call)
         slot = "Slot 1" if "Slot 1" in line else "Slot 2"
         is_v = 'data' not in match.group('v_type').lower()
-        temp_str, _ = self.get_current_temp(conf)
+        temp_str, _ = self.get_current_temp(conf) # 还原通联时的温度显示
 
         type_label = f"🎙️ 语音通联 ({slot})" if is_v else f"💾 数据模式 ({slot})"
+        # --- 100% 还原原始样式模板 ---
         body = (f"👤 **呼号**: {call}{info['name']}\n"
                 f"👥 **群组**: {target}\n"
                 f"📍 **地区**: {info['loc']}\n"
@@ -290,8 +286,11 @@ class MMDVMMonitor:
                 f"📦 **丢失**: {loss}%\n"
                 f"📉 **误码**: {ber}%\n"
                 f"🌡️ **温度**: {temp_str}")
-        
-        PushService.send(conf, type_label, body, is_voice=is_v)
+        PushService.send(conf, type_label, body, is_voice=is_v, async_mode=True)
 
 if __name__ == "__main__":
-    MMDVMMonitor().run()
+    monitor = MMDVMMonitor()
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        monitor.run_test()
+    else:
+        monitor.run()
