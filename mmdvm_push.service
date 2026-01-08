@@ -1,12 +1,15 @@
 [Unit]
 Description=MMDVM Log Push Notifier
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
 Group=root
 WorkingDirectory=/home/pi-star/MMDVM-Push-Notifier
+# 在此处强制延迟启动，确保网络完全稳定
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/python3 /home/pi-star/MMDVM-Push-Notifier/mmdvm_push.py
 Restart=always
 RestartSec=5
