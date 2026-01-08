@@ -217,6 +217,20 @@ class MMDVMMonitor:
                 f"⏰ **上线时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         PushService.send(conf, "⚙️ 系统启动通知", body, is_voice=False)
 
+    def run_test(self):
+        """在这里执行测试步骤"""
+        conf = ConfigManager.get_config()
+        ip, cpu, mem = self.get_sys_info()
+        temp_str, _ = self.get_current_temp(conf)
+        test_body = (f"🛠️ **推送通道测试**\n"
+                     f"✅ **状态**: 配置正常\n"
+                     f"🌐 **IP**: {ip}\n"
+                     f"🌡️ **温度**: {temp_str}\n"
+                     f"⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}")
+        print("Sending test message...")
+        PushService.send(conf, "🔔 测试推送", test_body, is_voice=False)
+        time.sleep(3) # 等待异步线程发送完成
+        
     def run(self):
         conf = ConfigManager.get_config()
         
