@@ -71,6 +71,19 @@ sudo bash install.sh
 2. Copy your **Token** from the "One-to-One Push" section.
 3. **设置**: 将 Token 填入管理页面并确保已关注 PushPlus 公众号。
 
+### 飞书机器人
+
+1.打开群聊：在飞书电脑端，选择一个您希望接收推送消息的群组。
+2.添加机器人：点击群组右上角的“设置”（三个点或设置图标） -> 群机器人 -> 添加机器人。
+3.选择机器人类型：在弹出列表中选择 “自定义机器人”。
+4.设置机器人信息：
+    机器人名称：例如“MMDVM 监控助手”。
+    描述：可填“接收 MMDVM 语音与数据推送”。
+5.获取 Webhook 地址：点击“添加”后，系统会生成一个 Webhook 地址。
+    重要：请复制并保存该地址，它类似于 https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxxxxxx。
+6.安全设置：选择“签名校验”
+    重要：请复制并保存密钥。
+     
 ---
 
 ## 📖 Usage / 使用说明
