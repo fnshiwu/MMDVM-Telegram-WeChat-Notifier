@@ -32,10 +32,40 @@ class ConfigManager:
         return cls._config
 
 class HamInfoManager:
-    """呼号信息检索：严格还原原始版完整国家表"""
     def __init__(self, id_file):
         self.id_file = id_file
         self._io_lock = Semaphore(4)
+        self.geo_map = {
+            "China": "🇨🇳 中国", "Hong Kong": "🇭🇰 中国香港", "Macao": "🇲🇴 中国澳门", "Taiwan": "🇹🇼 中国台湾",
+            "Japan": "🇯🇵 日本", "Korea": "🇰🇷 韩国", "South Korea": "🇰🇷 韩国", "North Korea": "🇰🇵 朝鲜",
+            "Thailand": "🇹🇭 泰国", "Singapore": "🇸🇬 新加坡", "Malaysia": "🇲🇾 马来西亚", "Indonesia": "🇮🇩 印度尼西亚",
+            "Philippines": "🇵🇭 菲律宾", "Vietnam": "🇻🇳 越南", "India": "🇮🇳 印度", "Pakistan": "🇵🇰 巴基斯坦",
+            "Sri Lanka": "🇱🇰 斯里兰卡", "Bangladesh": "🇧🇩 孟加拉国", "Nepal": "🇳🇵 尼泊尔", "Mongolia": "🇲🇳 蒙古",
+            "United Arab Emirates": "🇦🇪 阿联酋", "UAE": "🇦🇪 阿联酋", "Saudi Arabia": "🇸🇦 沙特", "Israel": "🇮🇱 以色列",
+            "Turkey": "🇹🇷 土耳其", "Iran": "🇮🇷 伊朗", "Iraq": "🇮🇶 伊拉克", "Kuwait": "🇰🇼 科威特",
+            "Oman": "🇴🇲 阿曼", "Qatar": "🇶🇦 卡塔尔", "Jordan": "🇯🇴 约旦", "Lebanon": "🇱🇧 黎巴嫩",
+            "Kazakhstan": "🇰🇿 哈萨克斯坦", "Uzbekistan": "🇺🇿 乌兹别克斯坦",
+            "United Kingdom": "🇬🇧 英国", "UK": "🇬🇧 英国", "England": "🇬🇧 英国", "Germany": "🇩🇪 德国",
+            "France": "🇫🇷 法国", "Italy": "🇮🇹 意大利", "Spain": "🇪🇸 西班牙", "Portugal": "🇵🇹 葡萄牙",
+            "Russia": "🇷🇺 俄罗斯", "Russian Federation": "🇷🇺 俄罗斯", "Netherlands": "🇳🇱 荷兰",
+            "Belgium": "🇧🇪 比利时", "Switzerland": "🇨🇭 瑞士", "Austria": "🇦🇹 奥地利", "Sweden": "🇸🇪 瑞典",
+            "Norway": "🇳🇴 挪威", "Denmark": "🇩🇰 丹麦", "Finland": "🇫🇮 芬兰", "Poland": "🇵🇱 波兰",
+            "Czech Republic": "🇨🇿 捷克", "Hungary": "🇭🇺 匈牙利", "Greece": "🇬🇷 希腊", "Ireland": "🇮🇪 爱尔兰",
+            "Romania": "🇷🇴 罗马尼亚", "Bulgaria": "🇧🇬 门加利亚", "Ukraine": "🇺🇦 乌克兰", "Belarus": "🇧🇾 白俄罗斯",
+            "Slovakia": "🇸🇰 斯洛伐克", "Croatia": "🇭🇷 跨罗地亚", "Serbia": "🇷🇸 塞尔维亚", "Slovenia": "🇸🇮 斯洛文尼亚",
+            "Estonia": "🇪🇪 爱沙尼亚", "Latvia": "🇱🇻 拉脱维亚", "Lithuania": "🇱🇹 立陶宛", "Iceland": "🇮🇸 冰岛",
+            "Luxembourg": "🇱🇺 卢森堡", "Monaco": "🇲🇨 摩纳哥", "Cyprus": "🇨🇾 塞浦路斯", "Malta": "🇲🇹 马耳他",
+            "United States": "🇺🇸 美国", "USA": "🇺🇸 美国", "Canada": "🇨🇦 加拿大", "Mexico": "🇲🇽 墨西哥",
+            "Cuba": "🇨🇺 古巴", "Jamaica": "🇯🇲 牙买加", "Puerto Rico": "🇵🇷 波多黎各", "Dominican Republic": "🇩🇴 多米尼加",
+            "Costa Rica": "🇨🇷 哥斯达黎加", "Panama": "🇵🇦 巴拿马", "Guatemala": "🇬🇹 危地马拉", "Honduras": "🇭🇳 洪都拉斯",
+            "Brazil": "🇧🇷 巴西", "Argentina": "🇦🇷 阿根廷", "Chile": "🇨🇱 智利", "Colombia": "🇨🇴 哥伦比亚",
+            "Peru": "🇵🇪 秘鲁", "Venezuela": "🇻🇪 委内瑞拉", "Uruguay": "🇺🇾 乌拉圭", "Paraguay": "🇵🇾 巴拉圭",
+            "Ecuador": "🇪🇨 厄瓜多尔", "Bolivia": "🇧🇴 玻利维亚",
+            "Australia": "🇦🇺 澳大利亚", "New Zealand": "🇳🇿 新西兰", "Fiji": "🇫🇯 斐济", "Papua New Guinea": "🇵🇬 巴布亚新几内亚",
+            "South Africa": "🇿🇦 南非", "Egypt": "🇪🇬 埃及", "Nigeria": "🇳🇬 尼日利亚", "Kenya": "🇰🇪 肯尼亚",
+            "Morocco": "🇲🇦 摩洛哥", "Algeria": "🇩🇿 阿尔及利亚", "Ethiopia": "🇪🇹 埃塞俄比亚", "Ghana": "🇬🇭 加纳",
+            "Tanzania": "🇹🇿 坦桑尼亚", "Uganda": "🇺🇬 乌干达", "Mauritius": "🇲🇺 毛里求斯", "Seychelles": "🇸🇨 塞舌尔"
+        }
 
     @lru_cache(maxsize=4096)
     def get_info(self, callsign):
@@ -49,64 +79,23 @@ class HamInfoManager:
                     if idx != -1:
                         start = mm.rfind(b'\n', 0, idx) + 1
                         end = mm.find(b'\n', idx)
-                        if end == -1: end = len(mm)
-                        raw_line = mm[start:end]
-                        try:
-                            line = raw_line.decode('utf-8')
-                        except:
-                            line = raw_line.decode('gb18030', 'ignore')
-                        
+                        line_bytes = mm[start:end]
+                        try: line = line_bytes.decode('utf-8')
+                        except: line = line_bytes.decode('gb18030', 'ignore')
                         parts = line.split(',')
                         first_name = parts[2].strip() if len(parts) > 2 else ""
                         last_name = parts[3].strip() if len(parts) > 3 else ""
                         city = parts[4].strip().title() if len(parts) > 4 else ""
                         state = parts[5].strip().upper() if len(parts) > 5 else ""
                         country = parts[6].strip()
-                        
-                        # --- 原始版完整国家映射表（100% 搬运） ---
-                        geo_map = {
-                            "China": "🇨🇳 中国", "Hong Kong": "🇭🇰 中国香港", "Macao": "🇲🇴 中国澳门", "Taiwan": "🇹🇼 中国台湾",
-                            "Japan": "🇯🇵 日本", "Korea": "🇰🇷 韩国", "South Korea": "🇰🇷 韩国", "North Korea": "🇰🇵 朝鲜",
-                            "Thailand": "🇹🇭 泰国", "Singapore": "🇸🇬 新加坡", "Malaysia": "🇲🇾 马来西亚", "Indonesia": "🇮🇩 印度尼西亚",
-                            "Philippines": "🇵🇭 菲律宾", "Vietnam": "🇻🇳 越南", "India": "🇮🇳 印度", "Pakistan": "🇵🇰 巴基斯坦",
-                            "Sri Lanka": "🇱🇰 斯里兰卡", "Bangladesh": "🇧🇩 孟加拉国", "Nepal": "🇳🇵 尼泊尔", "Mongolia": "🇲🇳 蒙古",
-                            "United Arab Emirates": "🇦🇪 阿联酋", "UAE": "🇦🇪 阿联酋", "Saudi Arabia": "🇸🇦 沙特", "Israel": "🇮🇱 以色列",
-                            "Turkey": "🇹🇷 土耳其", "Iran": "🇮🇷 伊朗", "Iraq": "🇮🇶 伊拉克", "Kuwait": "🇰🇼 科威特",
-                            "Oman": "🇴🇲 阿曼", "Qatar": "🇶🇦 卡塔尔", "Jordan": "🇯🇴 约旦", "Lebanon": "🇱🇧 黎巴嫩",
-                            "Kazakhstan": "🇰🇿 哈萨克斯坦", "Uzbekistan": "🇺🇿 乌兹别克斯坦",
-                            "United Kingdom": "🇬🇧 英国", "UK": "🇬🇧 英国", "England": "🇬🇧 英国", "Germany": "🇩🇪 德国",
-                            "France": "🇫🇷 法国", "Italy": "🇮🇹 意大利", "Spain": "🇪🇸 西班牙", "Portugal": "🇵🇹 葡萄牙",
-                            "Russia": "🇷🇺 俄罗斯", "Russian Federation": "🇷🇺 俄罗斯", "Netherlands": "🇳🇱 荷兰",
-                            "Belgium": "🇧🇪 比利时", "Switzerland": "🇨🇭 瑞士", "Austria": "🇦🇹 奥地利", "Sweden": "🇸🇪 瑞典",
-                            "Norway": "🇳🇴 挪威", "Denmark": "🇩🇰 丹麦", "Finland": "🇫🇮 芬兰", "Poland": "🇵🇱 波兰",
-                            "Czech Republic": "🇨🇿 捷克", "Hungary": "🇭🇺 匈牙利", "Greece": "🇬🇷 希腊", "Ireland": "🇮🇪 爱尔兰",
-                            "Romania": "🇷🇴 罗马尼亚", "Bulgaria": "🇧🇬 保加利亚", "Ukraine": "🇺🇦 乌克兰", "Belarus": "🇧🇾 白俄罗斯",
-                            "Slovakia": "🇸🇰 斯洛伐克", "Croatia": "🇭🇷 克罗地亚", "Serbia": "🇷🇸 塞尔维亚", "Slovenia": "🇸🇮 斯洛文尼亚",
-                            "Estonia": "🇪🇪 爱沙尼亚", "Latvia": "🇱🇻 拉脱维亚", "Lithuania": "🇱🇹 立陶宛", "Iceland": "🇮🇸 冰岛",
-                            "Luxembourg": "🇱🇺 卢森堡", "Monaco": "🇲🇨 摩纳哥", "Cyprus": "🇨🇾 塞浦路斯", "Malta": "🇲🇹 马耳他",
-                            "United States": "🇺🇸 美国", "USA": "🇺🇸 美国", "Canada": "🇨🇦 加拿大", "Mexico": "🇲🇽 墨西哥",
-                            "Cuba": "🇨🇺 古巴", "Jamaica": "🇯🇲 牙买加", "Puerto Rico": "🇵🇷 波多黎各", "Dominican Republic": "🇩🇴 多米尼加",
-                            "Costa Rica": "🇨🇷 哥斯达黎加", "Panama": "🇵🇦 巴拿马", "Guatemala": "🇬🇹 危地马拉", "Honduras": "🇭🇳 洪都拉斯",
-                            "Brazil": "🇧🇷 巴西", "Argentina": "🇦🇷 阿根廷", "Chile": "🇨🇱 智利", "Colombia": "🇨🇴 哥伦比亚",
-                            "Peru": "🇵🇪 秘鲁", "Venezuela": "🇻🇪 委内瑞拉", "Uruguay": "🇺🇾 乌拉圭", "Paraguay": "🇵🇾 巴拉圭",
-                            "Ecuador": "🇪🇨 厄瓜多尔", "Bolivia": "🇧🇴 玻利维亚",
-                            "Australia": "🇦🇺 澳大利亚", "New Zealand": "🇳🇿 新西兰", "Fiji": "🇫🇯 斐济", "Papua New Guinea": "🇵🇬 巴布亚新几内亚",
-                            "South Africa": "🇿🇦 南非", "Egypt": "🇪🇬 埃及", "Nigeria": "🇳🇬 尼日利亚", "Kenya": "🇰🇪 肯尼亚",
-                            "Morocco": "🇲🇦 摩洛哥", "Algeria": "🇩🇿 阿尔及利亚", "Ethiopia": "🇪🇹 埃塞俄比亚", "Ghana": "🇬🇭 加纳",
-                            "Tanzania": "🇹🇿 坦桑尼亚", "Uganda": "🇺🇬 乌干达", "Mauritius": "🇲🇺 毛里求斯", "Seychelles": "🇸🇨 塞舌尔"
-                        }
-
                         if any('\u4e00' <= char <= '\u9fff' for char in country):
-                            for k, v in geo_map.items():
+                            for k, v in self.geo_map.items():
                                 if k in country or (len(v.split()) > 1 and v.split()[1] in country):
                                     country = v
                                     break
-                        else:
-                            country = geo_map.get(country, country)
-
+                        else: country = self.geo_map.get(country, country)
                         full_name = f"{first_name} {last_name}".strip().upper()
-                        loc = f"{city}, {state} ({country})"
-                        return {"name": f" ({full_name})", "loc": loc}
+                        return {"name": f" ({full_name})", "loc": f"{city}, {state} ({country})"}
         except Exception: pass
         finally: self._io_lock.release()
         return {"name": "", "loc": "Unknown"}
@@ -121,35 +110,19 @@ class PushService:
         return base64.b64encode(hmac_code).decode('utf-8')
 
     @classmethod
-    def _do_push_logic(cls, config, type_label, body_text, is_voice):
-        # 飞书
+    def _do_push_logic(cls, config, type_label, body_text, color_tag):
         if config.get('push_fs_enabled') and config.get('fs_webhook'):
             ts = str(int(time.time()))
-            template = "blue" if is_voice else "orange" if "上线" in type_label else "green"
-            fs_payload = {
-                "msg_type": "interactive", 
-                "card": {
-                    "header": {"title": {"tag": "plain_text", "content": type_label}, "template": template}, 
-                    "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body_text}}]
-                }
-            }
+            payload = {"msg_type": "interactive", "card": {"header": {"title": {"tag": "plain_text", "content": type_label}, "template": color_tag}, "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body_text}}]}}
             if config.get('fs_secret'):
-                fs_payload["timestamp"], fs_payload["sign"] = ts, cls.get_fs_sign(config['fs_secret'], ts)
-            cls.post_request(config['fs_webhook'], data=json.dumps(fs_payload).encode(), is_json=True)
+                payload["timestamp"], payload["sign"] = ts, cls.get_fs_sign(config['fs_secret'], ts)
+            cls.post_request(config['fs_webhook'], data=json.dumps(payload).encode(), is_json=True)
 
-        # 微信 (PushPlus)
         if config.get('push_wx_enabled') and config.get('wx_token'):
             br = "<br>"
-            html_content = f"<b>{type_label}</b>{br}{br.join(body_text.splitlines())}"
-            d = json.dumps({"token": config['wx_token'], "title": type_label, "content": html_content, "template": "html"}).encode()
+            html = f"<b>{type_label}</b>{br}{br}{br.join(body_text.splitlines())}"
+            d = json.dumps({"token": config['wx_token'], "title": type_label, "content": html, "template": "html"}).encode()
             cls.post_request("http://www.pushplus.plus/send", data=d, is_json=True)
-
-        # TG
-        if config.get('push_tg_enabled') and config.get('tg_token') and config.get('tg_chat_id'):
-            text = f"<b>{type_label}</b>\n\n{body_text}"
-            url = f"https://api.telegram.org/bot{config['tg_token']}/sendMessage"
-            d = urllib.parse.urlencode({"chat_id": config['tg_chat_id'], "text": text, "parse_mode": "HTML"}).encode()
-            cls.post_request(url, data=d)
 
     @classmethod
     def post_request(cls, url, data=None, is_json=False):
@@ -160,11 +133,8 @@ class PushService:
         except: return None
 
     @classmethod
-    def send(cls, config, type_label, body_text, is_voice=True, async_mode=True):
-        if async_mode:
-            cls._executor.submit(cls._do_push_logic, config, type_label, body_text, is_voice)
-        else:
-            cls._do_push_logic(config, type_label, body_text, is_voice)
+    def send(cls, config, type_label, body_text, color_tag="blue"):
+        cls._executor.submit(cls._do_push_logic, config, type_label, body_text, color_tag)
 
 class MMDVMMonitor:
     def __init__(self):
@@ -173,11 +143,11 @@ class MMDVMMonitor:
         self.last_temp_check_time = 0
         self.ham_manager = HamInfoManager(LOCAL_ID_FILE)
         self.re_master = re.compile(
-            r'end of (?P<v_type>(?:voice )?|data )transmission from '
+            r'end of (?P<v_type>(?:voice\s+|data\s+)?)transmission from '
             r'(?P<call>[A-Z0-9/\-]+) to (?P<target>[A-Z0-9/\-\s]+?), '
-            r'(?P<dur>\d+\.?\d*) seconds, '
-            r'(?P<loss>\d+)% packet loss, '
-            r'BER: (?P<ber>\d+\.?\d*)%', re.IGNORECASE
+            r'(?P<dur>\d+\.?\d*) seconds'
+            r'(?:, (?P<loss>\d+)% packet loss)?'
+            r'(?:, BER: (?P<ber>\d+\.?\d*)%)?', re.IGNORECASE
         )
 
     def get_sys_info(self):
@@ -192,57 +162,20 @@ class MMDVMMonitor:
         try:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 temp_c = float(f.read()) / 1000.0
-            unit = conf.get('temp_unit', 'C')
-            if unit == 'F':
-                val = (temp_c * 9/5) + 32
-                return f"{val:.1f}°F", val
             return f"{temp_c:.1f}°C", temp_c
         except: return "N/A", 0.0
 
-    def check_temp_alert(self, conf):
-        if not conf.get('temp_alert_enabled'): return
-        now = time.time()
-        if now - self.last_temp_check_time < 60: return
-        self.last_temp_check_time = now
-        display_str, current_val = self.get_current_temp(conf)
-        threshold = float(conf.get('temp_threshold', 65.0))
-        if current_val >= threshold:
-            interval_sec = int(conf.get('temp_interval', 30)) * 60
-            if now - self.last_temp_alert_time > interval_sec:
-                self.last_temp_alert_time = now
-                alert_body = (f"🚨 **硬件高温预警**\n"
-                              f"🔥 **当前温度**: {display_str}\n"
-                              f"⚠️ **预警阈值**: {threshold:.1f}{conf.get('temp_unit','C')}\n"
-                              f"⏰ **检测时间**: {datetime.now().strftime('%H:%M:%S')}")
-                PushService.send(conf, "🌡️ 硬件状态警告", alert_body, is_voice=False)
-
-    def send_boot_notification(self, conf):
-        if not conf.get('boot_push_enabled', True): return
-        ip, cpu, mem = self.get_sys_info()
-        temp_str, _ = self.get_current_temp(conf)
-        body = (f"🚀 **设备已上线**\n"
-                f"🌐 **内网IP**: {ip}\n"
-                f"🌡️ **系统温度**: {temp_str}\n"
-                f"📊 **CPU占用**: {cpu}%\n"
-                f"💾 **内存占用**: {mem}\n"
-                f"⏰ **上线时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        PushService.send(conf, "⚙️ 系统启动通知", body, is_voice=False)
-
-    def run_test(self):
-        conf = ConfigManager.get_config()
-        ip, _, _ = self.get_sys_info()
-        temp_str, _ = self.get_current_temp(conf)
-        test_body = f"🛠️ **推送通道测试成功**\n🌐 **IP**: {ip}\n🌡️ **温度**: {temp_str}\n⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}"
-        PushService.send(conf, "🔔 测试推送", test_body, is_voice=False, async_mode=False)
-        print("Success")
-
     def run(self):
         conf = ConfigManager.get_config()
-        for i in range(12):
-            ip_check = subprocess.getoutput("hostname -I").strip()
-            if ip_check and not ip_check.startswith("127."): break
-            time.sleep(5)
-        self.send_boot_notification(conf) 
+        if conf.get('boot_push_enabled', True):
+            for i in range(10):
+                ip, cpu, mem = self.get_sys_info()
+                if ip != "Unknown": break
+                time.sleep(3)
+            temp_str, _ = self.get_current_temp(conf)
+            body = (f"🚀 **设备已上线**\n🌐 **当前IP**: {ip}\n🌡️ **系统温度**: {temp_str}\n📊 **CPU占用**: {cpu}%\n💾 **内存占用**: {mem}\n⏰ **时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            PushService.send(conf, "⚙️ 系统启动通知", body, color_tag="green")
+
         while True:
             try:
                 log_files = glob.glob(os.path.join(LOG_DIR, "MMDVM-*.log"))
@@ -250,7 +183,11 @@ class MMDVMMonitor:
                 current_log = max(log_files, key=os.path.getmtime)
                 with open(current_log, "r", encoding="utf-8", errors="ignore") as f:
                     f.seek(0, 2)
+                    last_rot_check = time.time()
                     while True:
+                        if time.time() - last_rot_check > 5:
+                            if max(log_files, key=os.path.getmtime) != current_log: break
+                            last_rot_check = time.time()
                         line = f.readline()
                         if not line: time.sleep(0.1); continue
                         self.process_line(line)
@@ -261,36 +198,34 @@ class MMDVMMonitor:
         match = self.re_master.search(line)
         if not match: return
         conf = ConfigManager.get_config()
-        self.check_temp_alert(conf) # 保留原始温度检测逻辑
         call = match.group('call').upper()
         dur = float(match.group('dur'))
-        loss, ber = match.group('loss'), match.group('ber') # 独立丢包和误码
-        target = match.group('target').strip()
-        if call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0): return
+        my_call = conf.get('my_callsign', '').upper()
+        
+        # --- 修复：屏蔽列表、最短时长、屏蔽自己呼号 ---
+        if call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0) or (my_call and call == my_call):
+            return
+        
         curr_ts = time.time()
         if call == self.last_msg["call"] and (curr_ts - self.last_msg["ts"]) < 3: return
         self.last_msg.update({"call": call, "ts": curr_ts})
+        
         info = self.ham_manager.get_info(call)
-        slot = "Slot 1" if "Slot 1" in line else "Slot 2"
+        temp_str, _ = self.get_current_temp(conf)
         is_v = 'data' not in match.group('v_type').lower()
-        temp_str, _ = self.get_current_temp(conf) # 还原通联时的温度显示
+        slot = " (Slot 1)" if "Slot 1" in line else " (Slot 2)" if "Slot 2" in line else ""
+        color = "blue" if is_v else "orange"
 
-        type_label = f"🎙️ 语音通联 ({slot})" if is_v else f"💾 数据模式 ({slot})"
-        # --- 100% 还原原始样式模板 ---
         body = (f"👤 **呼号**: {call}{info['name']}\n"
-                f"👥 **群组**: {target}\n"
+                f"👥 **群组**: {match.group('target').strip()}\n"
                 f"📍 **地区**: {info['loc']}\n"
                 f"📅 **日期**: {datetime.now().strftime('%Y-%m-%d')}\n"
                 f"⏰ **时间**: {datetime.now().strftime('%H:%M:%S')}\n"
                 f"⏳ **时长**: {dur}秒\n"
-                f"📦 **丢失**: {loss}%\n"
-                f"📉 **误码**: {ber}%\n"
+                f"📦 **丢失**: {match.group('loss') or '0'}%\n"
+                f"📉 **误码**: {match.group('ber') or '0.0'}%\n"
                 f"🌡️ **温度**: {temp_str}")
-        PushService.send(conf, type_label, body, is_voice=is_v, async_mode=True)
+        PushService.send(conf, f"{'🎙️ 语音通联' if is_v else '💾 数据模式'}{slot}", body, color_tag=color)
 
 if __name__ == "__main__":
-    monitor = MMDVMMonitor()
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        monitor.run_test()
-    else:
-        monitor.run()
+    MMDVMMonitor().run()
