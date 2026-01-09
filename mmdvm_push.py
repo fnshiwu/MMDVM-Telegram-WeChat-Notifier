@@ -163,6 +163,35 @@ class MMDVMMonitor:
             return sum(parts), parts[3] 
         except: return 0, 0
 
+class MMDVMMonitor:
+    def __init__(self):
+        self.last_msg = {"call": "", "ts": 0}
+        self.last_temp_alert_time = 0
+        self.last_temp_check_time = 0
+        self.ham_manager = HamInfoManager(LOCAL_ID_FILE)
+        self.re_master = re.compile(
+            r'end of (?P<v_type>(?:voice\s+|data\s+)?)transmission from '
+            r'(?P<call>[A-Z0-9/\-]+) to (?P<target>[A-Z0-9/\-\s]+?), '
+            r'(?P<dur>\d+\.?\d*) seconds'
+            r'(?:, (?P<loss>\d+)% packet loss)?'
+            r'(?:, BER: (?P<ber>\d+\.?\d*)%)?', re.IGNORECASE
+        )
+        self.cached_ip = None
+        self.last_ip_check = 0
+
+    def _get_cpu_stat(self):
+        """通用读取：兼容单核/多核，与 top 命令口径一致"""
+        try:
+            with open('/proc/stat', 'r') as f:
+                line = f.readline()
+            if not line or not line.startswith('cpu '): return 0, 0
+            # 提取: user, nice, system, idle, iowait, irq, softirq, steal
+            parts = [float(x) for x in line.split()[1:9]]
+            total_time = sum(parts)
+            idle_time = parts[3] # 纯空闲时间
+            return total_time, idle_time
+        except: return 0, 0
+
     def get_sys_info(self):
         try:
             now = time.time()
@@ -172,51 +201,37 @@ class MMDVMMonitor:
                         s.settimeout(0)
                         s.connect(('10.255.255.255', 1))
                         self.cached_ip = s.getsockname()[0]
-                except:
-                    self.cached_ip = "127.0.0.1"
+                except: self.cached_ip = "127.0.0.1"
                 self.last_ip_check = now
             
-# --- CPU 采样逻辑开始 ---
+            # --- CPU 核心采样 ---
             t1, i1 = self._get_cpu_stat()
-            time.sleep(0.2) 
+            time.sleep(0.5) 
             t2, i2 = self._get_cpu_stat()
             
-            total_delta = t2 - t1
-            idle_delta = i2 - i1
+            delta_total = t2 - t1
+            delta_idle = i2 - i1
             
-            if total_delta > 0:
-                cpu_val = (1 - idle_delta / total_delta) * 100
+            if delta_total > 0:
+                cpu_usage = (1.0 - (delta_idle / delta_total)) * 100.0
             else:
-                cpu_val = 0.0
-            # --- CPU 采样逻辑结束 ---
+                cpu_usage = 0.0
+            # ------------------
 
-            # 3. 计算内存使用率 (读取整个系统的内存情况)
             mem_dict = {}
             with open('/proc/meminfo', 'r') as f:
                 for line in f:
                     if ":" in line:
                         k, v = line.split(":", 1)
                         mem_dict[k.strip()] = int(v.split()[0])
-            total = mem_dict.get('MemTotal', 1)
-            avail = mem_dict.get('MemAvailable', mem_dict.get('MemFree', 0) + mem_dict.get('Cached', 0))
-            mem_val = (1 - avail / total) * 100
+            
+            total_m = mem_dict.get('MemTotal', 1)
+            avail_m = mem_dict.get('MemAvailable', mem_dict.get('MemFree', 0) + mem_dict.get('Cached', 0))
+            mem_val = (1 - avail_m / total_m) * 100
 
-            return self.cached_ip, f"{cpu_val:.1f}", f"{mem_val:.1f}%"
-        except: return "Unknown", "0.0", "0.0%"
-
-            # 3. 计算内存使用率
-            mem_dict = {}
-            with open('/proc/meminfo', 'r') as f:
-                for line in f:
-                    if ":" in line:
-                        k, v = line.split(":", 1)
-                        mem_dict[k.strip()] = int(v.split()[0])
-            total = mem_dict.get('MemTotal', 1)
-            avail = mem_dict.get('MemAvailable', mem_dict.get('MemFree', 0) + mem_dict.get('Cached', 0))
-            mem_val = (1 - avail / total) * 100
-
-            return self.cached_ip, f"{cpu_val:.1f}", f"{mem_val:.1f}%"
-        except: return "Unknown", "0.0", "0.0%"
+            return self.cached_ip, f"{cpu_usage:.1f}", f"{mem_val:.1f}%"
+        except:
+            return "Unknown", "0.0", "0.0%"
 
     def get_current_temp(self):
         try:
