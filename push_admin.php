@@ -74,7 +74,7 @@ $is_running = (strpos(shell_exec("sudo systemctl status $serviceName"), 'active 
 $lang = [
     'cn' => [
         'nav_dash'=>'仪表盘','nav_admin'=>'管理','nav_log'=>'日志','nav_power'=>'电源','nav_push'=>'推送设置','srv_ctrl'=>'服务控制','status'=>'状态','run'=>'运行中','stop'=>'已停止','btn_start'=>'启动','btn_stop'=>'停止','btn_res'=>'重启','btn_test'=>'发送测试','btn_save'=>'保存设置','conf'=>'推送功能设置','my_call'=>'我的呼号','min_dur'=>'最小推送时长 (秒)','qm_en'=>'开启静音时段','qm_range'=>'静音时间范围',
-        'boot_set'=>'启动通知','temp_set'=>'高温预警','en_boot'=>'开启启动推送','en_temp'=>'开启高温预警','th_temp'=>'预警阈值','int_temp'=>'预警间隔 (分)',
+        'boot_set'=>'启动通知','temp_set'=>'高温预警','en_boot'=>'设备启动提醒','en_temp'=>'高温预警','th_temp'=>'预警阈值','int_temp'=>'预警间隔 (分)',
         'tg_set'=>'Telegram 设置','wx_set'=>'微信 (PushPlus) 设置','fs_set'=>'飞书 (Feishu) 设置','en'=>'启用推送','ign_list'=>'忽略列表 (黑名单)','foc_list'=>'关注列表 (白名单)'
     ],
     'en' => [
