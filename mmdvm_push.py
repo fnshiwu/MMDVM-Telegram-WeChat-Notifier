@@ -1,4 +1,4 @@
-import os, time, json, glob, re, urllib.request, urllib.parse, sys, base64, hmac, hashlib, mmap, socket
+import os, time, json, glob, re, urllib.request, urllib.parse, sys, base64, hmac, hashlib, mmap, subprocess
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -63,7 +63,7 @@ class HamInfoManager:
             "Ecuador": "🇪🇨 厄瓜多尔", "Bolivia": "🇧🇴 玻利维亚",
             "Australia": "🇦🇺 澳大利亚", "New Zealand": "🇳🇿 新西兰", "Fiji": "🇫🇯 斐济", "Papua New Guinea": "🇵🇬 巴布亚新几内亚",
             "South Africa": "🇿🇦 南非", "Egypt": "🇪🇬 埃及", "Nigeria": "🇳🇬 尼日利亚", "Kenya": "🇰🇪 肯尼亚",
-            "Morocco": "🇲🇦 摩纳哥", "Algeria": "🇩🇿 阿尔及利亚", "Ethiopia": "🇪🇹 埃塞俄比亚", "Ghana": "🇬🇭 加纳",
+            "Morocco": "🇲🇦 摩洛哥", "Algeria": "🇩🇿 阿尔及利亚", "Ethiopia": "🇪🇹 埃塞俄比亚", "Ghana": "🇬🇭 加纳",
             "Tanzania": "🇹🇿 坦桑尼亚", "Uganda": "🇺🇬 乌干达", "Mauritius": "🇲🇺 毛里求斯", "Seychelles": "🇸🇨 塞舌尔"
         }
 
@@ -149,103 +149,30 @@ class MMDVMMonitor:
             r'(?:, (?P<loss>\d+)% packet loss)?'
             r'(?:, BER: (?P<ber>\d+\.?\d*)%)?', re.IGNORECASE
         )
-        # 初始化性能状态缓存
-        self.last_cpu_times = self._get_cpu_jiffies()
-        self.cached_ip = None
-        self.last_ip_check = 0
-
-    def _get_cpu_jiffies(self):
-        """直接读取内核 CPU 时间片，完全替代系统命令"""
-        try:
-            with open('/proc/stat', 'r') as f:
-                line = f.readline()
-            parts = list(map(float, line.split()[1:5]))
-            return sum(parts), parts[3] 
-        except: return 0, 0
-
-class MMDVMMonitor:
-    def __init__(self):
-        self.last_msg = {"call": "", "ts": 0}
-        self.last_temp_alert_time = 0
-        self.last_temp_check_time = 0
-        self.ham_manager = HamInfoManager(LOCAL_ID_FILE)
-        self.re_master = re.compile(
-            r'end of (?P<v_type>(?:voice\s+|data\s+)?)transmission from '
-            r'(?P<call>[A-Z0-9/\-]+) to (?P<target>[A-Z0-9/\-\s]+?), '
-            r'(?P<dur>\d+\.?\d*) seconds'
-            r'(?:, (?P<loss>\d+)% packet loss)?'
-            r'(?:, BER: (?P<ber>\d+\.?\d*)%)?', re.IGNORECASE
-        )
-        self.cached_ip = None
-        self.last_ip_check = 0
-
-    def _get_cpu_stat(self):
-        """通用读取：兼容单核/多核，与 top 命令口径一致"""
-        try:
-            with open('/proc/stat', 'r') as f:
-                line = f.readline()
-            if not line or not line.startswith('cpu '): return 0, 0
-            # 提取: user, nice, system, idle, iowait, irq, softirq, steal
-            parts = [float(x) for x in line.split()[1:9]]
-            total_time = sum(parts)
-            idle_time = parts[3] # 纯空闲时间
-            return total_time, idle_time
-        except: return 0, 0
 
     def get_sys_info(self):
         try:
-            now = time.time()
-            if not self.cached_ip or (now - self.last_ip_check > 3600):
-                try:
-                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                        s.settimeout(0)
-                        s.connect(('10.255.255.255', 1))
-                        self.cached_ip = s.getsockname()[0]
-                except: self.cached_ip = "127.0.0.1"
-                self.last_ip_check = now
-            
-            # --- CPU 核心采样 ---
-            t1, i1 = self._get_cpu_stat()
-            time.sleep(0.5) 
-            t2, i2 = self._get_cpu_stat()
-            
-            delta_total = t2 - t1
-            delta_idle = i2 - i1
-            
-            if delta_total > 0:
-                cpu_usage = (1.0 - (delta_idle / delta_total)) * 100.0
-            else:
-                cpu_usage = 0.0
-            # ------------------
+            ip = subprocess.getoutput("hostname -I").split()[0]
+            cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'")
+            mem = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.1f%%\", $3*100/$2 }'")
+            return ip, cpu, mem
+        except: return "Unknown", "0", "0"
 
-            mem_dict = {}
-            with open('/proc/meminfo', 'r') as f:
-                for line in f:
-                    if ":" in line:
-                        k, v = line.split(":", 1)
-                        mem_dict[k.strip()] = int(v.split()[0])
-            
-            total_m = mem_dict.get('MemTotal', 1)
-            avail_m = mem_dict.get('MemAvailable', mem_dict.get('MemFree', 0) + mem_dict.get('Cached', 0))
-            mem_val = (1 - avail_m / total_m) * 100
-
-            return self.cached_ip, f"{cpu_usage:.1f}", f"{mem_val:.1f}%"
-        except:
-            return "Unknown", "0.0", "0.0%"
-
-    def get_current_temp(self):
+    def get_current_temp(self, conf):
         try:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 temp_c = float(f.read()) / 1000.0
-            return f"{temp_c:.1f}°C"
-        except: return "N/A"
+            return f"{temp_c:.1f}°C", temp_c
+        except: return "N/A", 0.0
 
     def run(self):
         conf = ConfigManager.get_config()
         if conf.get('boot_push_enabled', True):
-            time.sleep(0.5)
-            ip, cpu, mem = self.get_sys_info()
-            temp_str = self.get_current_temp()
+            for i in range(10):
+                ip, cpu, mem = self.get_sys_info()
+                if ip != "Unknown": break
+                time.sleep(3)
+            temp_str, _ = self.get_current_temp(conf)
             body = (f"🚀 **设备已上线**\n🌐 **当前IP**: {ip}\n🌡️ **系统温度**: {temp_str}\n📊 **CPU占用**: {cpu}%\n💾 **内存占用**: {mem}\n⏰ **时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             PushService.send(conf, "⚙️ 系统启动通知", body, color_tag="green")
 
@@ -275,6 +202,7 @@ class MMDVMMonitor:
         dur = float(match.group('dur'))
         my_call = conf.get('my_callsign', '').upper()
         
+        # --- 修复：屏蔽列表、最短时长、屏蔽自己呼号 ---
         if call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0) or (my_call and call == my_call):
             return
         
@@ -283,8 +211,7 @@ class MMDVMMonitor:
         self.last_msg.update({"call": call, "ts": curr_ts})
         
         info = self.ham_manager.get_info(call)
-        # 备注：此处沿用您原文中带参数的调用方式
-        temp_str = self.get_current_temp() 
+        temp_str, _ = self.get_current_temp(conf)
         is_v = 'data' not in match.group('v_type').lower()
         slot = " (Slot 1)" if "Slot 1" in line else " (Slot 2)" if "Slot 2" in line else ""
         color = "blue" if is_v else "orange"
