@@ -176,19 +176,13 @@ class MMDVMMonitor:
                     self.cached_ip = "127.0.0.1"
                 self.last_ip_check = now
             
-# 2. 计算整个系统的 CPU 负载 (增加 0.1s 采样窗口以获取真实值)
+            # CPU 采样
             t1, idle1 = self._get_cpu_jiffies()
-            time.sleep(0.1)  # 关键点：暂停 100ms 捕获整个系统的 CPU 活动
+            time.sleep(0.1) 
             t2, idle2 = self._get_cpu_jiffies()
-            
             delta_total = t2 - t1
             delta_idle = idle2 - idle1
-            
-            if delta_total > 0:
-                # 计算逻辑：(总时间 - 空闲时间) / 总时间 = 整个系统占用率
-                cpu_val = (1 - delta_idle / delta_total) * 100
-            else:
-                cpu_val = 0.0
+            cpu_val = (1 - delta_idle / delta_total) * 100 if delta_total > 0 else 0.0
 
             # 3. 计算内存使用率 (读取整个系统的内存情况)
             mem_dict = {}
