@@ -176,9 +176,9 @@ class MMDVMMonitor:
                     self.cached_ip = "127.0.0.1"
                 self.last_ip_check = now
             
-            # CPU 采样
+# --- CPU 采样逻辑开始 ---
             t1, i1 = self._get_cpu_stat()
-            time.sleep(0.2) # 增加采样时间到 200ms 提高多核精度
+            time.sleep(0.2) 
             t2, i2 = self._get_cpu_stat()
             
             total_delta = t2 - t1
@@ -188,6 +188,7 @@ class MMDVMMonitor:
                 cpu_val = (1 - idle_delta / total_delta) * 100
             else:
                 cpu_val = 0.0
+            # --- CPU 采样逻辑结束 ---
 
             # 3. 计算内存使用率 (读取整个系统的内存情况)
             mem_dict = {}
