@@ -5,9 +5,9 @@ from functools import lru_cache
 from threading import Semaphore
 
 # --- 核心版本号 ---
-VERSION = "v3.0.7"
+VERSION = "v3.0.7-S"
 
-# --- [修复网页端调用] 必须置于顶部 ---
+# --- [修复网页端调用] ---
 if len(sys.argv) > 1 and sys.argv[1] == "--version":
     print(VERSION)
     sys.exit(0)
@@ -41,6 +41,7 @@ class ConfigManager:
 class HamInfoManager:
     def __init__(self, id_file):
         self.id_file = id_file
+        # [移植] 限制并发文件读取数，防止IO争抢
         self._io_lock = Semaphore(4)
         self.geo_map = {
             "China": "🇨🇳 中国", "Hong Kong": "🇭🇰 中国香港", "Macao": "🇲🇴 中国澳门", "Taiwan": "🇹🇼 中国台湾",
@@ -111,6 +112,7 @@ class HamInfoManager:
 class PushService:
     _max_workers = 3
     _executor = ThreadPoolExecutor(max_workers=_max_workers)
+    # [移植] 限制并发推送任务，保护系统资源
     _push_semaphore = Semaphore(_max_workers)
 
     @staticmethod
@@ -144,7 +146,7 @@ class PushService:
 
     @classmethod
     def post_with_retry(cls, url, data=None, is_json=False, retries=2):
-        """[S级加固] 强制重试与丢弃机制"""
+        """[S级加固] 保持强制重试与丢弃机制"""
         for i in range(retries + 1):
             try:
                 req = urllib.request.Request(url, data=data, method='POST') if data else urllib.request.Request(url)
@@ -152,7 +154,7 @@ class PushService:
                 with urllib.request.urlopen(req, timeout=10) as response:
                     return response.read().decode()
             except:
-                if i == retries: return None # 彻底失败，丢弃任务防止卡死
+                if i == retries: return None
                 time.sleep(1)
 
     @classmethod
@@ -166,7 +168,15 @@ class MMDVMMonitor:
         self.last_temp_alert_time = 0
         self.last_temp_check_time = 0
         self.ham_manager = HamInfoManager(LOCAL_ID_FILE)
+        # 保持 v3.0.4 正则：捕获 voice/data, call, target, dur, loss, ber
         self.re_master = re.compile(r'end of (?P<v_type>(?:voice\s+|data\s+)?)transmission from (?P<call>[A-Z0-9/\-]+) to (?P<target>[A-Z0-9/\-\s]+?), (?P<dur>\d+\.?\d*) seconds(?:, (?P<loss>\d+)% packet loss)?(?:, BER: (?P<ber>\d+\.?\d*)%)?', re.IGNORECASE)
+
+    # [移植] 静音时段检测逻辑
+    def is_quiet_time(self, conf):
+        if not conf.get('quiet_mode', {}).get('enabled'): return False
+        now = datetime.now().strftime("%H:%M")
+        start, end = conf['quiet_mode'].get('start', '23:00'), conf['quiet_mode'].get('end', '07:00')
+        return (start <= now <= end) if start <= end else (now >= start or now <= end)
 
     def get_sys_info(self):
         try:
@@ -218,7 +228,7 @@ class MMDVMMonitor:
                 if not log_files: time.sleep(5); continue
                 current_log = max(log_files, key=os.path.getmtime)
                 
-                # [S级加固] 日志打开逻辑保护，防止轮转闪退
+                # [S级加固] 日志轮转保护
                 try:
                     with open(current_log, "r", encoding="utf-8", errors="ignore") as f:
                         f.seek(0, 2)
@@ -244,6 +254,12 @@ class MMDVMMonitor:
         call = match.group('call').upper()
         dur = float(match.group('dur'))
 
+        # [移植] 吸收优化版过滤策略
+        if self.is_quiet_time(conf): return
+        # 白名单优先：如果设置了白名单且呼号不在其中，则过滤
+        focus = conf.get('focus_list', [])
+        if focus and call not in focus: return
+        # 黑名单与自身过滤
         if call == conf.get('my_callsign') or call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0):
             return
 
@@ -260,6 +276,9 @@ class MMDVMMonitor:
         PushService.send(conf, f"{'🎙️ 语音通联' if is_v else '💾 数据模式'}{slot}", body, is_voice=is_v)
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--version":
+        print(VERSION)
+        sys.exit(0)
     monitor = MMDVMMonitor()
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
         conf = ConfigManager.get_config()
