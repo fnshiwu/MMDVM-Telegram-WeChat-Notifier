@@ -225,7 +225,9 @@ class MMDVMMonitor:
         self.check_temp_alert(conf)
         call = match.group('call').upper()
         dur = float(match.group('dur'))
-        if call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0): return
+# 增加 conf.get('my_callsign') 的判断
+        if call == conf.get('my_callsign') or call in conf.get('ignore_list', []) or dur < conf.get('min_duration', 1.0):
+        return
         curr_ts = time.time()
         if call == self.last_msg["call"] and (curr_ts - self.last_msg["ts"]) < 3: return
         self.last_msg.update({"call": call, "ts": curr_ts})
