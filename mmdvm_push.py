@@ -172,6 +172,7 @@ class MMDVMMonitor:
         )
 
     def get_sys_info(self):
+        """其他系统信息维持原有获取办法"""
         try:
             ip = subprocess.getoutput("hostname -I").split()[0]
             cpu = subprocess.getoutput("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'")
@@ -180,9 +181,12 @@ class MMDVMMonitor:
         except: return "Unknown", "0", "0"
 
     def get_current_temp(self, conf):
+        """仅修改此处：使用原生方式读取温度文件，不调用 cat 或 top"""
         try:
+            # 树莓派/Linux 通用 CPU 温度路径
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 temp_c = float(f.read()) / 1000.0
+            
             unit = conf.get('temp_unit', 'C')
             if unit == 'F':
                 val = (temp_c * 9/5) + 32
